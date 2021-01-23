@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 contract VaultNFT is ERC721, AccessControl {
     using Counters for Counters.Counter;
@@ -55,11 +56,28 @@ contract VaultToken is ERC20, AccessControl {
 }
 
 contract VaultFactory is AccessControl {
-    IERC20 public vaultToken;
-    IERC721 public vaultNFT;
+    using SafeERC20 for IERC20;
+    using SafeMath for uint256;
 
-    constructor() public {
+    VaultToken public vaultToken;
+    VaultNFT public vaultNFT;
+    IERC20 public sourceToken;
+
+    event VaultCreated(address creator, uint256 amount, uint256 vaultId);
+
+    constructor(IERC20 _sourceToken) public {
         vaultToken = new VaultToken(address(this));
         vaultNFT = new VaultNFT(address(this));
+        sourceToken = _sourceToken;
+    }
+
+    function createVault (uint256 amount) external {
+        uint256 balanceBefore = sourceToken.balanceOf(address(this));
+        sourceToken.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 balanceAfter = sourceToken.balanceOf(address(this));
+        require(balanceAfter.sub(balanceBefore) == amount, "Where's my money?");
+        vaultToken.mint(msg.sender, amount);
+        uint256 vaultId = vaultNFT.mint(msg.sender);
+        emit VaultCreated(msg.sender, amount, vaultId);
     }
 }
