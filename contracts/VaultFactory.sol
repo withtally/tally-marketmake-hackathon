@@ -67,6 +67,7 @@ contract Vault {
     }
 
     // delegate on underlying governance
+    
 
     // vote on underlying governance
 
@@ -87,8 +88,9 @@ contract VaultFactory is AccessControl {
     VaultToken public vaultToken;
     VaultNFT public vaultNFT;
     IERC20 public sourceToken;
+    mapping (uint256 => Vault) public vaultMapping;
 
-    event VaultCreated(address creator, uint256 amount, uint256 vaultId);
+    event VaultCreated(address creator, uint256 amount, uint256 vaultId, address vaultAddress);
 
     constructor(IERC20 _sourceToken) public {
         vaultToken = new VaultToken(address(this));
@@ -97,13 +99,15 @@ contract VaultFactory is AccessControl {
     }
 
     function createVault (uint256 amount) external {
-        uint256 balanceBefore = sourceToken.balanceOf(address(this));
-        sourceToken.safeTransferFrom(msg.sender, address(this), amount);
-        uint256 balanceAfter = sourceToken.balanceOf(address(this));
+        Vault newVault = new Vault(sourceToken);
+        uint256 balanceBefore = sourceToken.balanceOf(address(newVault));
+        sourceToken.safeTransferFrom(msg.sender, address(newVault), amount);
+        uint256 balanceAfter = sourceToken.balanceOf(address(newVault));
         require(balanceAfter.sub(balanceBefore) == amount, "Where's my money?");
         vaultToken.mint(msg.sender, amount);
         uint256 vaultId = vaultNFT.mint(msg.sender);
-        emit VaultCreated(msg.sender, amount, vaultId);
+        vaultMapping[vaultId] = newVault;
+        emit VaultCreated(msg.sender, amount, vaultId, address(newVault));
     }
 
 
