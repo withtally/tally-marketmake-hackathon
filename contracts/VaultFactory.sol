@@ -55,6 +55,31 @@ contract VaultToken is ERC20, AccessControl {
     }
 }
 
+contract Vault {
+    using SafeERC20 for IERC20;
+
+    IERC20 public sourceToken;
+    address public owner;
+
+    constructor(IERC20 _sourceToken) {
+        owner = msg.sender;
+        sourceToken = _sourceToken;
+    }
+
+    // delegate on underlying governance
+
+    // vote on underlying governance
+
+    // close vault and return funds
+    function close (address payable recipient) external {
+        require(msg.sender == owner, "Caller does not own this vault");
+        uint256 vaultBalanceBefore = sourceToken.balanceOf(address(this));
+        sourceToken.safeTransfer(recipient, vaultBalanceBefore);
+        require(sourceToken.balanceOf(address(this)) == 0, "Unexpected error transferring tokens");
+        selfdestruct(recipient);
+    }
+}
+
 contract VaultFactory is AccessControl {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
@@ -80,4 +105,6 @@ contract VaultFactory is AccessControl {
         uint256 vaultId = vaultNFT.mint(msg.sender);
         emit VaultCreated(msg.sender, amount, vaultId);
     }
+
+
 }
