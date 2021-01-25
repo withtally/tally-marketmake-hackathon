@@ -71,6 +71,7 @@ contract Vault {
 
     // vote on underlying governance
 
+
     // close vault and return funds
     function close (address payable recipient) external {
         require(msg.sender == owner, "Caller does not own this vault");
@@ -110,5 +111,22 @@ contract VaultFactory is AccessControl {
         emit VaultCreated(msg.sender, amount, vaultId, address(newVault));
     }
 
+    function close(uint256 vaultId) external { 
+        require(msg.sender == vaultNFT.ownerOf(vaultId), "Not your stuff");
+
+        Vault vault = vaultMapping[vaultId];
+           
+        uint256 sourceBalanceBefore = sourceToken.balanceOf(address(vault));
+        uint256 vaultBalanceBefore = vaultToken.balanceOf(msg.sender);
+        require(vaultBalanceBefore >= sourceBalanceBefore, "Not enough tokens to close vault");
+
+        vaultToken.burn(msg.sender, vaultBalanceBefore);
+        uint256 vaultBalanceAfter = vaultToken.balanceOf(address(vault));
+        require(vaultBalanceBefore.sub(sourceBalanceBefore) == vaultBalanceAfter, "Where's my money?");
+
+        vaultNFT.burn(vaultId);
+        
+        vaultMapping[vaultId].close(msg.sender);
+    }
 
 }
