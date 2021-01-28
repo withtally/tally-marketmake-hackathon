@@ -55,22 +55,50 @@ contract VaultToken is ERC20, AccessControl {
     }
 }
 
+// Compound Token Interface
+interface ICompoundERC20 is IERC20 {
+  function delegate(address delegatee) external;
+}
+
+// Compound governor alpha interface
+interface ICompoundGovernorAlpha {
+    function castVote(uint proposalId, bool support) external;
+    function castVoteBySig(uint proposalId, bool support, uint8 v, bytes32 r, bytes32 s) external;
+}
+
 contract Vault {
-    using SafeERC20 for IERC20;
+    using SafeERC20 for ICompoundERC20;
 
-    IERC20 public sourceToken;
+    ICompoundERC20 public sourceToken;
+    ICompoundGovernorAlpha public governorAlpha;
     address public owner;
+    IERC721 public nft; 
+    uint256 public vaultId;
 
-    constructor(IERC20 _sourceToken) {
+    event Delegation(address delegator, address delegatee);
+    event Voted(address voter, uint256 proposalId, bool support);
+
+    constructor(ICompoundERC20 _sourceToken, ICompoundGovernorAlpha _governorAlpha, address _nft, uint256 _vaultId) {
         owner = msg.sender;
         sourceToken = _sourceToken;
+        governorAlpha = _governorAlpha;
+        nft = IERC721(_nft);
+        vaultId = _vaultId;
     }
 
     // delegate on underlying governance
-    
+    function delegate(address delegatee) external {
+        require(msg.sender == nft.ownerOf(vaultId), "You're not the owner of this vault");
+        sourceToken.delegate(delegatee);
+        emit Delegation(msg.sender, delegatee);
+    }
 
     // vote on underlying governance
-
+    function vote(uint proposalId, bool support) external {
+        require(msg.sender == nft.ownerOf(vaultId), "You're not the owner of this vault");
+        governorAlpha.castVote(proposalId, support);
+        emit Voted(msg.sender, proposalId, support);
+    }
 
     // close vault and return funds
     function close (address payable recipient) external {
@@ -83,30 +111,35 @@ contract Vault {
 }
 
 contract VaultFactory is AccessControl {
-    using SafeERC20 for IERC20;
+    using SafeERC20 for ICompoundERC20;
     using SafeMath for uint256;
 
     VaultToken public vaultToken;
     VaultNFT public vaultNFT;
-    IERC20 public sourceToken;
+    ICompoundERC20 public sourceToken;
+    ICompoundGovernorAlpha public governorAlpha;
     mapping (uint256 => Vault) public vaultMapping;
 
     event VaultCreated(address creator, uint256 amount, uint256 vaultId, address vaultAddress);
 
-    constructor(IERC20 _sourceToken) public {
+    constructor(ICompoundERC20 _sourceToken, ICompoundGovernorAlpha _governorAlpha) public {
         vaultToken = new VaultToken(address(this));
         vaultNFT = new VaultNFT(address(this));
         sourceToken = _sourceToken;
+        governorAlpha = _governorAlpha;
     }
 
     function createVault (uint256 amount) external {
-        Vault newVault = new Vault(sourceToken);
+        uint256 vaultId = vaultNFT.mint(msg.sender);
+        Vault newVault = new Vault(sourceToken, governorAlpha, address(vaultNFT), vaultId);
+
         uint256 balanceBefore = sourceToken.balanceOf(address(newVault));
         sourceToken.safeTransferFrom(msg.sender, address(newVault), amount);
+        sourceToken.delegate(address(newVault));
         uint256 balanceAfter = sourceToken.balanceOf(address(newVault));
         require(balanceAfter.sub(balanceBefore) == amount, "Where's my money?");
         vaultToken.mint(msg.sender, amount);
-        uint256 vaultId = vaultNFT.mint(msg.sender);
+        
         vaultMapping[vaultId] = newVault;
         emit VaultCreated(msg.sender, amount, vaultId, address(newVault));
     }
@@ -115,7 +148,7 @@ contract VaultFactory is AccessControl {
         require(msg.sender == vaultNFT.ownerOf(vaultId), "Not your stuff");
 
         Vault vault = vaultMapping[vaultId];
-           
+
         uint256 sourceBalanceBefore = sourceToken.balanceOf(address(vault));
         uint256 vaultBalanceBefore = vaultToken.balanceOf(msg.sender);
         require(vaultBalanceBefore >= sourceBalanceBefore, "Not enough tokens to close vault");

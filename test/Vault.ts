@@ -1,11 +1,13 @@
 import { Signer } from "@ethersproject/abstract-signer";
 import { ethers, waffle } from "hardhat";
+import { expect } from "chai";
 
 import VaultFactoryArtifact from "../artifacts/contracts/VaultFactory.sol/VaultFactory.json";
 import MockTokenArtifact from "../artifacts/contracts/mocks/mockToken.sol/MockToken.json";
 import VaultTokenArtifact from "../artifacts/contracts/VaultFactory.sol/VaultToken.json";
 import VaultNFTArtifact from "../artifacts/contracts/VaultFactory.sol/VaultNFT.json";
 import VaultArtifact from "../artifacts/contracts/VaultFactory.sol/Vault.json";
+import MockGovernorAlphaArtifact from "../artifacts/contracts/mocks/mockGovernorAlpha.sol/MockGovernorAlpha.json";
 
 import { Accounts, Signers } from "../types";
 import { Vault } from "../typechain/Vault";
@@ -13,7 +15,8 @@ import { VaultFactory } from "../typechain/VaultFactory";
 import { MockToken } from "../typechain/MockToken";
 import { VaultToken } from "../typechain/VaultToken";
 import { VaultNFT } from "../typechain/VaultNFT";
-import { expect } from "chai";
+
+import {MockGovernorAlpha} from "../typechain/MockGovernorAlpha";
 
 const { deployContract } = waffle;
 
@@ -37,11 +40,13 @@ describe("Unit tests", function () {
     let vaultNFT: VaultNFT;
     let vaultNFTAddress: string;
     let vault: Vault;
+    let governorAlpha: MockGovernorAlpha;
     const amount = ethers.utils.parseEther("1");
     beforeEach(async function () {
       sourceToken = (await deployContract(this.signers.admin, MockTokenArtifact, [])) as MockToken;
+      governorAlpha = (await deployContract(this.signers.admin, MockGovernorAlphaArtifact, [])) as MockGovernorAlpha;
       vaultFactory = (await deployContract(this.signers.admin, VaultFactoryArtifact, [
-        sourceToken.address,
+        sourceToken.address, governorAlpha.address,
       ])) as VaultFactory;
       vaultTokenAddress = await vaultFactory.vaultToken();
       vaultNFTAddress = await vaultFactory.vaultNFT();
@@ -100,10 +105,19 @@ describe("Unit tests", function () {
   describe("Vault", function () {
     let sourceToken: MockToken;
     let vault: Vault;
+    let governorAlpha: MockGovernorAlpha;
+    let vaultNFTAddress: string;
+    let vaultFactory: VaultFactory;
     const amount = 1000;
     beforeEach(async function () {
+      governorAlpha = (await deployContract(this.signers.admin, MockGovernorAlphaArtifact, [])) as MockGovernorAlpha;
       sourceToken = (await deployContract(this.signers.admin, MockTokenArtifact, [])) as MockToken;
-      vault = (await deployContract(userA, VaultArtifact, [sourceToken.address])) as Vault;
+      vaultFactory = (await deployContract(this.signers.admin, VaultFactoryArtifact, [
+        sourceToken.address, governorAlpha.address,
+      ])) as VaultFactory;
+      vaultNFTAddress = await vaultFactory.vaultNFT();
+      vault = (await deployContract(userA, VaultArtifact, [sourceToken.address, governorAlpha.address, vaultNFTAddress,1])) as Vault;
+      
 
       await sourceToken.transfer(vault.address, amount);
     });
@@ -138,5 +152,15 @@ describe("Unit tests", function () {
       const codeAfter = await admin.provider?.getCode(vault.address);
       expect(codeAfter).to.equal(EMPTY_CODE);
     });
+
+    it("should delegate votes", async function () {
+      const addressA = await userA.getAddress();
+
+      await expect(vault.delegate(addressA)).to.emit(vault, "Delegation").withArgs(vault.address, addressA);
+
+      expect(await sourceToken.delegates(vault.address)).to.be.equal(addressA);
+    });
+
+    //it("should cast a vote", async function () {});
   });
 });
