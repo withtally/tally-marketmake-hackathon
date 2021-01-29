@@ -94,7 +94,7 @@ contract Vault {
     function delegate(address delegatee) external {
         require(msg.sender == nft.ownerOf(vaultId), "You're not the owner of this vault");
         sourceToken.delegate(delegatee);
-        emit Delegation(msg.sender, delegatee);
+        emit Delegation(address(this), delegatee);
     }
 
     // vote on underlying governance
