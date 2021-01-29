@@ -1,5 +1,5 @@
 import { Signer } from "@ethersproject/abstract-signer";
-import { ethers, waffle } from "hardhat";
+import hre, { ethers, waffle } from "hardhat";
 import { expect } from "chai";
 
 import VaultFactoryArtifact from "../artifacts/contracts/VaultFactory.sol/VaultFactory.json";
@@ -35,6 +35,8 @@ describe("Unit tests", function () {
   });
 
   describe("VaultFactory", function () {
+    const epochSize = 4;
+
     let vaultFactory: VaultFactory;
     let sourceToken: MockToken;
     let vaultToken: VaultToken;
@@ -50,6 +52,7 @@ describe("Unit tests", function () {
       vaultFactory = (await deployContract(this.signers.admin, VaultFactoryArtifact, [
         sourceToken.address,
         governorAlpha.address,
+        epochSize,
       ])) as VaultFactory;
       vaultTokenAddress = await vaultFactory.vaultToken();
       vaultNFTAddress = await vaultFactory.vaultNFT();
@@ -71,14 +74,12 @@ describe("Unit tests", function () {
     it("Creates vault and emits event", async function () {
       await sourceToken.approve(vaultFactory.address, amount);
       await expect(vaultFactory.createVault(amount)).to.emit(vaultFactory, "VaultCreated");
-      //.withArgs(this.accounts.admin, amount, 1);
     });
 
     it("Mints tokens on vault creation", async function () {
       await sourceToken.approve(vaultFactory.address, amount);
       const balanceBefore = await vaultToken.balanceOf(this.accounts.admin);
       await expect(vaultFactory.createVault(amount)).to.emit(vaultFactory, "VaultCreated");
-      //.withArgs(this.accounts.admin, amount, 1);
       const balanceAfter = await vaultToken.balanceOf(this.accounts.admin);
       expect(balanceAfter.sub(balanceBefore)).to.eq(amount);
     });
@@ -87,7 +88,6 @@ describe("Unit tests", function () {
       await sourceToken.approve(vaultFactory.address, amount);
       const balanceBefore = await vaultNFT.balanceOf(this.accounts.admin);
       await expect(vaultFactory.createVault(amount)).to.emit(vaultFactory, "VaultCreated");
-      //.withArgs(this.accounts.admin, amount, 1);
       const balanceAfter = await vaultNFT.balanceOf(this.accounts.admin);
       expect(balanceAfter.sub(balanceBefore)).to.eq(1);
       expect(await vaultNFT.ownerOf(1)).to.eq(this.accounts.admin);
@@ -104,9 +104,70 @@ describe("Unit tests", function () {
       expect(await sourceToken.balanceOf(vault.address)).to.be.equal(amount);
     });
 
-    // TODO: test close at expiry
+    it("Owner can close their vault", async function () {
+      await sourceToken.approve(vaultFactory.address, amount);
+      await vaultFactory.createVault(amount);
+      const expectedVaultId = 1;
+      const vaultAddress = await vaultFactory.vaultMapping(expectedVaultId);
 
-    // TODO: test own-close
+      await expect(vaultFactory.closeOwnVault(expectedVaultId))
+        .to.emit(vaultFactory, "VaultClosedByOwner")
+        .withArgs(this.accounts.admin, expectedVaultId, vaultAddress);
+    });
+
+    it("Non-owner cannot close an owner's vault", async function () {
+      await sourceToken.approve(vaultFactory.address, amount);
+      await vaultFactory.createVault(amount);
+      const expectedVaultId = 1;
+      const vaultFactory2 = vaultFactory.connect(userB);
+
+      await expect(vaultFactory2.closeOwnVault(expectedVaultId)).to.be.revertedWith("Not your stuff");
+    });
+
+    it("Cannot close an unexpired vault", async function () {
+      await sourceToken.approve(vaultFactory.address, amount);
+      await vaultFactory.createVault(amount);
+      const expectedVaultId = 1;
+      const vaultFactory2 = vaultFactory.connect(userB);
+
+      await expect(vaultFactory2.closeExpiredVault(expectedVaultId)).to.be.revertedWith("Vault not yet expired");
+    });
+
+    it("Anyone can close an expired vault", async function () {
+      await sourceToken.approve(vaultFactory.address, amount);
+      await vaultFactory.createVault(amount);
+      const expectedVaultId = 1;
+      const vaultAddress = await vaultFactory.vaultMapping(expectedVaultId);
+      const vaultFactory2 = vaultFactory.connect(userA);
+      for (let i = 0; i < epochSize; i++) {
+        await hre.network.provider.send("evm_mine");
+      }
+
+      const tGOV = await vaultToken.connect(this.signers.admin);
+      await tGOV.transfer(await userA.getAddress(), amount);
+
+      await expect(vaultFactory2.closeExpiredVault(expectedVaultId))
+        .to.emit(vaultFactory, "ExpiredVaultClosed")
+        .withArgs(await userA.getAddress(), expectedVaultId, vaultAddress);
+    });
+
+    it("Need enough tGOV to close an expired vault", async function () {
+      await sourceToken.approve(vaultFactory.address, amount);
+      await vaultFactory.createVault(amount);
+      const expectedVaultId = 1;
+      const vaultFactory2 = vaultFactory.connect(userA);
+      for (let i = 0; i < epochSize; i++) {
+        await hre.network.provider.send("evm_mine");
+      }
+
+      const notQuiteEnough = amount.sub(1);
+      const tGOV = await vaultToken.connect(this.signers.admin);
+      await tGOV.transfer(await userA.getAddress(), notQuiteEnough);
+
+      await expect(vaultFactory2.closeExpiredVault(expectedVaultId)).to.be.revertedWith(
+        "Not enough tokens to close vault",
+      );
+    });
   });
 
   describe("Vault", function () {

@@ -117,9 +117,7 @@ contract VaultFactory is AccessControl {
     using SafeERC20 for ICompoundERC20;
     using SafeMath for uint256;
 
-    uint256 public constant EPOCH_SIZE = 500000;
-
-
+    uint256 public epochSize;
     VaultToken public vaultToken;
     VaultNFT public vaultNFT;
     ICompoundERC20 public sourceToken;
@@ -132,7 +130,8 @@ contract VaultFactory is AccessControl {
     event VaultClosedByOwner(address owner, uint256 vaultId, address vaultAddress);
     event ExpiredVaultClosed(address closer, uint256 vaultId, address vaultAddress);
 
-    constructor(ICompoundERC20 _sourceToken, ICompoundGovernorAlpha _governorAlpha) public {
+    constructor(ICompoundERC20 _sourceToken, ICompoundGovernorAlpha _governorAlpha, uint256 _epochSize) public {
+        epochSize = _epochSize;
         vaultToken = new VaultToken(address(this));
         vaultNFT = new VaultNFT(address(this));
         sourceToken = _sourceToken;
@@ -140,7 +139,7 @@ contract VaultFactory is AccessControl {
     }
 
     function currentEpochExpiry() public view returns (uint256)  {
-        return block.number.div(EPOCH_SIZE).add(1).mul(EPOCH_SIZE);
+        return block.number.div(epochSize).add(1).mul(epochSize);
     }
 
     function createVault (uint256 amount) external {
