@@ -66,13 +66,17 @@ interface ICompoundGovernorAlpha {
     function castVoteBySig(uint proposalId, bool support, uint8 v, bytes32 r, bytes32 s) external;
 }
 
+interface IVaultNFT {
+    function ownerOf(uint256 tokenId) external view returns (address owner);
+}
+
 contract Vault {
     using SafeERC20 for ICompoundERC20;
 
     ICompoundERC20 public sourceToken;
     ICompoundGovernorAlpha public governorAlpha;
     address public owner;
-    IERC721 public nft; 
+    IVaultNFT public nft; 
     uint256 public vaultId;
 
     event Delegation(address delegator, address delegatee);
@@ -82,7 +86,7 @@ contract Vault {
         owner = msg.sender;
         sourceToken = _sourceToken;
         governorAlpha = _governorAlpha;
-        nft = IERC721(_nft);
+        nft = IVaultNFT(_nft);
         vaultId = _vaultId;
     }
 
@@ -101,12 +105,11 @@ contract Vault {
     }
 
     // close vault and return funds
-    function close (address payable recipient) external {
+    function close (address recipient) external {
         require(msg.sender == owner, "Caller does not own this vault");
         uint256 vaultBalanceBefore = sourceToken.balanceOf(address(this));
         sourceToken.safeTransfer(recipient, vaultBalanceBefore);
         require(sourceToken.balanceOf(address(this)) == 0, "Unexpected error transferring tokens");
-        selfdestruct(recipient);
     }
 }
 
@@ -114,19 +117,30 @@ contract VaultFactory is AccessControl {
     using SafeERC20 for ICompoundERC20;
     using SafeMath for uint256;
 
+    uint256 public constant EPOCH_SIZE = 500000;
+
+
     VaultToken public vaultToken;
     VaultNFT public vaultNFT;
     ICompoundERC20 public sourceToken;
     ICompoundGovernorAlpha public governorAlpha;
     mapping (uint256 => Vault) public vaultMapping;
+    // mapping of vaults to expiry epochs
+    mapping (uint256 => uint256) public vaultToExpiryEpochs;
 
     event VaultCreated(address creator, uint256 amount, uint256 vaultId, address vaultAddress);
+    event VaultClosedByOwner(address owner, uint256 vaultId, address vaultAddress);
+    event ExpiredVaultClosed(address closer, uint256 vaultId, address vaultAddress);
 
     constructor(ICompoundERC20 _sourceToken, ICompoundGovernorAlpha _governorAlpha) public {
         vaultToken = new VaultToken(address(this));
         vaultNFT = new VaultNFT(address(this));
         sourceToken = _sourceToken;
         governorAlpha = _governorAlpha;
+    }
+
+    function currentEpochExpiry() public view returns (uint256)  {
+        return block.number.div(EPOCH_SIZE).add(1).mul(EPOCH_SIZE);
     }
 
     function createVault (uint256 amount) external {
@@ -141,25 +155,39 @@ contract VaultFactory is AccessControl {
         vaultToken.mint(msg.sender, amount);
         
         vaultMapping[vaultId] = newVault;
+        vaultToExpiryEpochs[vaultId] = currentEpochExpiry();
         emit VaultCreated(msg.sender, amount, vaultId, address(newVault));
     }
 
-    function close(uint256 vaultId) external { 
+    function closeOwnVault(uint256 vaultId) external { 
         require(msg.sender == vaultNFT.ownerOf(vaultId), "Not your stuff");
 
+        _close(vaultId, msg.sender);
+        emit VaultClosedByOwner(msg.sender, vaultId, address(vaultMapping[vaultId]));
+    }
+
+    function closeExpiredVault(uint256 vaultId) external { 
+        require(vaultToExpiryEpochs[vaultId] != 0, "Vault doesn't exist");
+        require(vaultToExpiryEpochs[vaultId] < block.number, "Vault not yet expired");
+        require(vaultNFT.ownerOf(vaultId) != address(0), "Vault already closed");
+
+        _close(vaultId, msg.sender);
+        emit ExpiredVaultClosed(msg.sender, vaultId, address(vaultMapping[vaultId]));
+    }
+
+    function _close(uint256 vaultId, address receipient) private { 
         Vault vault = vaultMapping[vaultId];
 
         uint256 sourceBalanceBefore = sourceToken.balanceOf(address(vault));
-        uint256 vaultBalanceBefore = vaultToken.balanceOf(msg.sender);
+        uint256 vaultBalanceBefore = vaultToken.balanceOf(receipient);
         require(vaultBalanceBefore >= sourceBalanceBefore, "Not enough tokens to close vault");
 
-        vaultToken.burn(msg.sender, vaultBalanceBefore);
+        vaultToken.burn(receipient, vaultBalanceBefore);
         uint256 vaultBalanceAfter = vaultToken.balanceOf(address(vault));
         require(vaultBalanceBefore.sub(sourceBalanceBefore) == vaultBalanceAfter, "Where's my money?");
 
         vaultNFT.burn(vaultId);
         
-        vaultMapping[vaultId].close(msg.sender);
+        vaultMapping[vaultId].close(receipient);
     }
-
 }

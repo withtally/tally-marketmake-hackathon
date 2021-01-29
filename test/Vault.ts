@@ -100,6 +100,10 @@ describe("Unit tests", function () {
       ) as Vault;
       expect(await sourceToken.balanceOf(vault.address)).to.be.equal(amount);
     });
+
+    // TODO: test close at expiry
+
+    // TODO: test own-close
   });
 
   describe("Vault", function () {
@@ -137,20 +141,6 @@ describe("Unit tests", function () {
 
       const vaultBalance = await sourceToken.balanceOf(vault.address);
       expect(vaultBalance).to.be.equal(0);
-    });
-
-    it("destroying a Vault cleans up the code", async function () {
-      const admin = this.signers.admin;
-      const EMPTY_CODE = "0x";
-
-      const codeBefore = await admin.provider?.getCode(vault.address);
-      expect(codeBefore).to.not.equal(EMPTY_CODE);
-
-      const addressA = await userA.getAddress();
-      await vault.close(addressA);
-
-      const codeAfter = await admin.provider?.getCode(vault.address);
-      expect(codeAfter).to.equal(EMPTY_CODE);
     });
 
     it("should delegate votes", async function () {
