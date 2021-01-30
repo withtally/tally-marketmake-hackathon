@@ -4,9 +4,9 @@ import { expect } from "chai";
 
 import VaultFactoryArtifact from "../artifacts/contracts/VaultFactory.sol/VaultFactory.json";
 import MockTokenArtifact from "../artifacts/contracts/mocks/mockToken.sol/MockToken.json";
-import VaultTokenArtifact from "../artifacts/contracts/VaultFactory.sol/VaultToken.json";
-import VaultNFTArtifact from "../artifacts/contracts/VaultFactory.sol/VaultNFT.json";
-import VaultArtifact from "../artifacts/contracts/VaultFactory.sol/Vault.json";
+import VaultTokenArtifact from "../artifacts/contracts/VaultToken.sol/VaultToken.json";
+import VaultNFTArtifact from "../artifacts/contracts/VaultNFT.sol/VaultNFT.json";
+import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json";
 import MockGovernorAlphaArtifact from "../artifacts/contracts/mocks/mockGovernorAlpha.sol/MockGovernorAlpha.json";
 
 import { Accounts, Signers } from "../types";
