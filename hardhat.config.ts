@@ -50,9 +50,23 @@ function createTestnetConfig(network: keyof typeof chainIds): NetworkUserConfig 
   };
 }
 
+function createGanacheConfig(): NetworkUserConfig {
+  const url: string = "http://localhost:8545";
+  return {
+    accounts: {
+      count: 10,
+      initialIndex: 0,
+      mnemonic,
+      path: "m/44'/60'/0'/0",
+    },
+    url,
+  };
+}
+
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   networks: {
+    localhost: createGanacheConfig(),
     hardhat: {
       chainId: chainIds.hardhat,
     },
