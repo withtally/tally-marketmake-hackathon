@@ -168,6 +168,23 @@ describe("Unit tests", function () {
         "Not enough tokens to close vault",
       );
     });
+
+    it("Should get address NFTs balance", async function () {
+      await sourceToken.approve(vaultFactory.address, amount);
+      const balanceBefore = await vaultFactory.addressNFTBalance(this.accounts.admin);
+      await expect(vaultFactory.createVault(amount)).to.emit(vaultFactory, "VaultCreated");
+      const balanceAfter = await vaultFactory.addressNFTBalance(this.accounts.admin);
+      expect(balanceAfter.sub(balanceBefore)).to.eq(1);
+      expect(await vaultNFT.ownerOf(1)).to.eq(this.accounts.admin);
+    });
+
+    it("Should get current NFT supply", async function () {
+      await sourceToken.approve(vaultFactory.address, amount);
+      const balanceBefore = await vaultFactory.nftSupply();
+      await expect(vaultFactory.createVault(amount)).to.emit(vaultFactory, "VaultCreated");
+      const balanceAfter = await vaultFactory.nftSupply();
+      expect(balanceAfter.sub(balanceBefore)).to.eq(1);
+    });
   });
 
   describe("Vault", function () {

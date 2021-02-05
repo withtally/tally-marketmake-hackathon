@@ -91,26 +91,11 @@ contract VaultFactory is AccessControl {
         vaultMapping[vaultId].close(receipient);
     }
 
-    function vaultByAddress(address _owner) external view returns(uint256[] memory ownerTokens) {
-        uint256 tokenCount = vaultNFT.balanceOf(_owner);
+    function addressNFTBalance(address _address) external view returns (uint256)  {
+        return vaultNFT.balanceOf(_address);
+    }
 
-        if (tokenCount == 0) {
-            return new uint256[](0);
-        } else {
-            uint256[] memory result = new uint256[](tokenCount);
-            uint256 totalVaults = vaultNFT.totalSupply();
-            uint256 resultIndex = 0;
-
-            uint256 vaultId;
-
-            for (vaultId = 1; vaultId <= totalVaults; vaultId++) {
-                if (vaultToAddress[vaultId] == _owner) {
-                    result[resultIndex] = vaultId;
-                    resultIndex++;
-                }
-            }
-
-            return result;
-        }
+    function nftSupply() external view returns (uint256)  {
+        return vaultNFT.totalSupply();
     }
 }
