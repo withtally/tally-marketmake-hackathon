@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   // 2. Copy the mnemonic from ganache-cli into your .env file
   // 3. Connect metamask to network localhost:8545
   // 4. Copy your address in metamask and paste it in line 14 above
-  // 5. To run thie script:
+  // 5. To run this script:
   // npx hardhat run ./scripts/testnet_deploy.ts --network localhost
   // A test setup should be deployed, and your metamask user will have
   // tokens and ether. 

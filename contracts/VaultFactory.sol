@@ -24,6 +24,7 @@ contract VaultFactory is AccessControl {
     mapping (uint256 => Vault) public vaultMapping;
     // mapping of vaults to expiry epochs
     mapping (uint256 => uint256) public vaultToExpiryEpochs;
+    mapping (uint256 => address) public vaultToAddress;
 
     event VaultCreated(address creator, uint256 amount, uint256 vaultId, address vaultAddress);
     event VaultClosedByOwner(address owner, uint256 vaultId, address vaultAddress);
@@ -54,6 +55,7 @@ contract VaultFactory is AccessControl {
         
         vaultMapping[vaultId] = newVault;
         vaultToExpiryEpochs[vaultId] = currentEpochExpiry();
+        vaultToAddress[vaultId] = msg.sender;
         emit VaultCreated(msg.sender, amount, vaultId, address(newVault));
     }
 
@@ -87,5 +89,28 @@ contract VaultFactory is AccessControl {
         vaultNFT.burn(vaultId);
         
         vaultMapping[vaultId].close(receipient);
+    }
+
+    function vaultByAddress(address _owner) external view returns(uint256[] memory ownerTokens) {
+        uint256 tokenCount = vaultNFT.balanceOf(_owner);
+
+        if (tokenCount == 0) {
+            return new uint256[](0);
+        } else {
+            uint256[] memory result = new uint256[](tokenCount);
+            uint256 totalVaults = vaultNFT.totalSupply();
+            uint256 resultIndex = 0;
+
+            uint256 vaultId;
+
+            for (vaultId = 1; vaultId <= totalVaults; vaultId++) {
+                if (vaultToAddress[vaultId] == _owner) {
+                    result[resultIndex] = vaultId;
+                    resultIndex++;
+                }
+            }
+
+            return result;
+        }
     }
 }
