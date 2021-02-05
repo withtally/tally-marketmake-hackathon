@@ -1,17 +1,17 @@
-# Solidity Template
+# Vote Splitter Contracts
 
-My favourite setup for writing Solidity smart contracts.
+### See the front-end code here:
 
-- [Hardhat](https://github.com/nomiclabs/hardhat): compile and run the smart contracts on a local development network
-- [TypeChain](https://github.com/ethereum-ts/TypeChain): generate TypeScript types for smart contracts
-- [Ethers](https://github.com/ethers-io/ethers.js/): renowned Ethereum library and wallet implementation
-- [Waffle](https://github.com/EthWorks/Waffle): tooling for writing comprehensive smart contract tests
-- [Solhint](https://github.com/protofire/solhint): linter
-- [Solcover](https://github.com/sc-forks/solidity-coverage) code coverage
-- [Prettier Plugin Solidity](https://github.com/prettier-solidity/prettier-plugin-solidity): code formatter
+https://github.com/withtally/tally-mm-hackathon-frontend
 
-This is a GitHub template, which means you can reuse it as many times as you want. You can do that by clicking the "Use this
-template" button at the top of the page.
+Voter Splitter lets owners of on-chain governance tokens temporarily transfer their voting power to someone else.
+
+### How it works:
+
+1. Users can lock governance tokens in a vault and receive that many ERC20 vote tokens. After creation, the user controls the vault and the wrapped tokens.
+2. The user can sell the vault, which is an ERC721 NFT. The vault controls the underlying votes on e.g. Compound for a few months.
+3. At any time, the owner of the vault can close their position by redeeming enough wrapped tokens to cover the underlying tokens in the vault. They will receive the original governance tokens.
+4. Every 50000 blocks – about every 3 months – all outstanding vaults expire. Anyone can close an expired vault by redeeming enough wrapped tokens to cover the underlying tokens in the vault.
 
 ## Usage
 
